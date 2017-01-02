@@ -1,0 +1,61 @@
+This is the source release of SafeInit, our proof-of-concept prototype
+showing that compilers can mitigate uninitialized data vulnerabilities by
+simply initializing all memory, without significant performance overhead.
+We demonstrate this by compiling code with a modified version of LLVM
+(which performs the initialization and then runs modified optimizations)
+along with an allocator (a modified tcmalloc) which ensures that heap
+memory is also initialized.
+
+Our NDSS 2017 paper can be downloaded from:
+
+https://www.vusec.net/download/?t=papers/safeinit_ndss17.pdf
+
+If you'd like to cite it, you can find a .bib entry on our website at
+https://www.vusec.net/publications/.
+
+Our modified version of LLVM is provided in 'llvm', and our modified
+version of tcmalloc is provided in 'gperftools'. As mentioned in our
+paper, we also include the LLVM patches from D13363 (non-local DSE)
+and D18714 (writeonly IR attribute). Note also the modified constants
+in tcmalloc's src/common.h. We are grateful of the hard work from
+everyone involved in these projects.
+
+After building and installing LLVM, and building gperftools (for
+tcmalloc), you can use SafeInit by passing -fsanitize=safeinit as a
+compiler flag. It's important that the flag is passed at all stages of
+your builds, since code can be miscompiled if the compiler is not aware
+that the allocator initializes memory (for LTO builds using LLVMgold,
+you can pass "-Wl,-plugin-opt=-malloc-returns-zero"). It's also
+important to link against and run the output binary with the hardened
+allocator (set LD_LIBRARY_PATH to gperftools/.libs); this is NOT done
+automatically, so you need to do this yourself ("-ltcmalloc_minimal"
+along with "-L/path/to/gperftools/.libs", for example).
+
+It should (of course) be possible to replicate the performance results
+from our paper with this code, and the benchmarks should all run and
+produce the right results. However, it differs in some ways from our
+internal version, so if you encounter problems, feel free to get in
+touch. Remember that, as we discuss in our paper, this is a prototype;
+the optimization passes may contain bugs and fail to correctly compile
+some code. To catch any obvious errors, we recommend that you build
+LLVM in debug mode with assertions enabled!
+
+The misc-checks directory contains some of the manual test cases we used
+to test/verify the behaviour of tools such as SafeInit, MemorySanitizer
+and valgrind. Some of them are intended for manual inspection of the
+generated code only (and don't link, because we left external functions
+unimplemented), the remainder should compile and run. Usually they just
+make printf calls and/or return an exit code. It is a fairly random mix,
+but I'm making these available just in case any of them are helpful to
+other researchers (if only as inspiration); there is no documentation
+and test scripts are not included, but all examples should (of course)
+be correctly sanitized by SafeInit where relevant.
+
+Remember, you can also build libraries using SafeInit, which is important
+for full protection; although glibc doesn't build using LLVM, we (for
+example) successfully did this with musl and libc++, which allows you
+to harden full applications.
+
+You can annotate variables or types with '__attribute__((no_zeroinit))'
+to disable initialization, if necessary for performance reasons. See our
+paper for further discussion about this and many other considerations!
